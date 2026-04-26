@@ -12,4 +12,4 @@ resources:
     memory: 128Mi
 
 autoscaling:        
-  enabled: false    
+  enabled: false
