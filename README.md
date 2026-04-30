@@ -1,9 +1,8 @@
-# SRE Pretest - Kubernetes Infrastructure on AWS
+# Kubernetes SRE Platform on AWS
 
-This project demonstrates a complete SRE workflow including infrastructure provisioning, containerization, Kubernetes deployment, CI/CD automation, 
-and multi-environment deployment practices.
+This project demonstrates a complete SRE workflow including infrastructure provisioning, containerization, Kubernetes deployment, CI/CD automation, and multi-environment deployment practices.
 
-> **AI Usage Declaration**: AI tools were extensively used throughout this project as a pair-programming assistant. See [docs/AI_USAGE.md](docs/AI_USAGE.md) for details.
+> **AI Usage Declaration**: AI tools were extensively used throughout this project as a pair-programming assistant. 
 
 ---
 
@@ -30,18 +29,6 @@ AWS Load Balancer
 External Users
 http://<LB-URL>/sre.txt → "Hello SRE!"
 ```
-
----
-
-## Prerequisites
-
-- AWS Account with IAM User (AdministratorAccess)
-- AWS CLI v2
-- AWS credentials configured (`aws configure`)
-- Terraform >= 1.0
-- kubectl >= 1.30
-- Helm >= 3.0
-- Docker >= 24.0
 
 ---
 
@@ -83,9 +70,22 @@ sre-pretest/
 
 ---
 
-## Q1 - Terraform Kubernetes Cluster
+## Prerequisites
 
-### Infrastructure
+- AWS Account with IAM User (AdministratorAccess)
+- AWS CLI v2
+- AWS credentials configured (`aws configure`)
+- Terraform >= 1.0
+- kubectl >= 1.30
+- Helm >= 3.0
+- Docker >= 24.0
+
+---
+
+## Infrastructure (Terraform)
+
+### Cloud & Cluster
+
 - **Cloud Provider**: AWS (us-east-1)
 - **Kubernetes**: EKS v1.33 (Standard Support until July 2026)
 - **Nodes**: 2x t3.micro (auto-scaling: min 1, desired 2, max 5)
@@ -93,6 +93,7 @@ sre-pretest/
 - **State Management**: S3 Backend (`sre-pretest-tfstate`)
 
 ### Node Auto-Scaling
+
 - **Min size**: 1 node (cost saving during low traffic)
 - **Desired size**: 2 nodes (normal operation with high availability)
 - **Max size**: 5 nodes (increased from 3 for better pod distribution and high availability)
@@ -104,6 +105,7 @@ sre-pretest/
 - When nodes are underutilized, they are automatically removed
 
 ### Cost Optimization
+
 - **Region**: us-east-1 (N. Virginia) selected for lowest cost in AWS
 - **Kubernetes version**: v1.33 (Standard Support) to avoid Extended Support surcharge (~$0.60/hr)
 - **Instance type**: t3.micro for cost efficiency in non-production environment
@@ -128,7 +130,7 @@ kubectl get nodes
 
 ---
 
-## Q2 - Dockerfile
+## Container (Dockerfile)
 
 Custom nginx image with `sre.txt` accessible at `/sre.txt`.
 
@@ -145,9 +147,10 @@ docker stop nginx-sre-test && docker rm nginx-sre-test
 
 ---
 
-## Q3 - Helm Chart Deployment
+## Kubernetes Deployment (Helm)
 
 ### Features
+
 - **HPA**: Auto-scaling based on CPU (70%) and Memory (75%)
   - alpha/beta: HPA disabled for resource efficiency
   - staging: min 1, max 3
@@ -155,7 +158,7 @@ docker stop nginx-sre-test && docker rm nginx-sre-test
 - **Readiness Probe**: Checks `/sre.txt` every 5s (initialDelay: 5s)
 - **Liveness Probe**: Checks `/sre.txt` every 10s (initialDelay: 10s)
 - **LoadBalancer**: AWS Classic Load Balancer for external access
-- **Conditional Replicas**: When HPA is enabled, replicas are managed by HPA only 
+- **Conditional Replicas**: When HPA is enabled, replicas are managed by HPA only
 
 ### Two-Layer Auto-Scaling (Node & Pod)
 
@@ -175,11 +178,11 @@ Cluster Autoscaler adds new Nodes (up to max_size: 5)
 
 ```bash
 # Push image to ECR
-aws ecr create-repository --repository-name nginx-sre --region us-east-1  # Create ECR repository
-ECR_URI=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.us-east-1.amazonaws.com/nginx-sre  # Get ECR URI
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_URI  # Authenticate Docker to ECR
-docker tag nginx-sre:latest $ECR_URI:latest  # Tag image
-docker push $ECR_URI:latest  # Push to ECR
+aws ecr create-repository --repository-name nginx-sre --region us-east-1
+ECR_URI=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.us-east-1.amazonaws.com/nginx-sre
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_URI
+docker tag nginx-sre:latest $ECR_URI:latest
+docker push $ECR_URI:latest
 
 # Deploy with Helm
 helm upgrade --install alpha helm/nginx-sre \
@@ -198,6 +201,7 @@ curl http://$(kubectl get svc alpha -n alpha -o jsonpath='{.status.loadBalancer.
 ```
 
 ### Known Limitations & Future Improvements
+
 - `_helpers.tpl` currently uses `Release.Name` as fullname for simplicity. Standard Helm practice would implement `nginx-sre.labels` and `nginx-sre.selectorLabels` for better observability and monitoring integration.
 - Currently using Classic Load Balancer (CLB). Production recommendation: AWS Load Balancer Controller with ALB Ingress for path-based routing and cost efficiency.
 - HPA requires metrics-server installation for CPU/Memory metrics collection.
@@ -205,11 +209,12 @@ curl http://$(kubectl get svc alpha -n alpha -o jsonpath='{.status.loadBalancer.
 
 ---
 
-## Q4 - CI/CD Pipeline
+## CI/CD Pipeline
 
 Two GitHub Actions workflows:
 
-### `terraform.yaml` - Infrastructure Pipeline
+### `terraform.yaml` — Infrastructure Pipeline
+
 Triggered when `terraform/` files change on `main` branch.
 
 ```
@@ -226,7 +231,8 @@ Checkout → Configure AWS → Setup Terraform → Init → Format Check → Pla
 | Terraform Plan | Preview infrastructure changes |
 | Terraform Apply | Apply changes to AWS (main branch only) |
 
-### `app.yaml` - Application Pipeline
+### `app.yaml` — Application Pipeline
+
 Triggered on push to `main`, `release/beta`, `release/staging`, or release tag.
 
 ```
@@ -246,26 +252,28 @@ Checkout → Configure AWS → Login ECR → Build Image → Push Image to ECR �
 | Deploy | Helm upgrade with environment-specific values |
 
 ### GitHub Secrets Required
+
+```
 AWS_ACCESS_KEY_ID      → AWS IAM User Access Key
 AWS_SECRET_ACCESS_KEY  → AWS IAM User Secret Key
+```
 
 > **Security Note**: For production use, recommend replacing long-lived AWS credentials with OIDC (OpenID Connect) for keyless, short-lived authentication.
 
 ---
 
-## Q5 - GitOps Multi-Environment Deployment
+## Multi-Environment Deployment (GitOps)
 
-### GitOps Concept
+All four environments share the same Helm chart. Environment-specific configuration lives in `envs/<env>/values.yaml` and is applied at deploy time — no chart duplication, no branching logic inside templates. Git is the single source of truth; every deployment is triggered by a Git event.
 
-This project implements a **GitOps-inspired** approach using GitHub Actions
-as the delivery mechanism. While a full GitOps implementation would use
-tools like ArgoCD or Flux for pull-based deployment and drift detection,
-this project demonstrates the core GitOps principles:
+### Branch Strategy
 
-- **Git as single source of truth**: All environment configurations are version-controlled in Git
-- **Declarative configuration**: Environment states defined in `envs/` directory
-- **Automated deployment**: Git events (push, tag) trigger CI/CD pipeline automatically
-- **Environment isolation**: Different branches map to different environments
+```
+main              → alpha environment (auto deploy)
+release/beta      → beta environment (auto deploy)
+release/staging   → staging environment (auto deploy)
+tag v*.*.*        → production environment (manual gate)
+```
 
 ### Deployment Flow
 
@@ -289,14 +297,6 @@ Publish tag v*.*.* with manual approval gate
 After approval, deploy to production
 ```
 
-### Branch Strategy
-```
-main              → alpha environment (auto deploy)
-release/beta      → beta environment (auto deploy)
-release/staging   → staging environment (auto deploy)
-tag v*..          → production environment (manual gate)
-```
-
 ### Environment Configuration
 
 Each environment has its own `values.yaml` under `envs/`:
@@ -310,8 +310,7 @@ Each environment has its own `values.yaml` under `envs/`:
 
 ### Deploy to Specific Environment
 
-In practice, deployment is handled automatically by `app.yaml` CI/CD pipeline.
-The following commands can be used for manual deployment if needed:
+In practice, deployment is handled automatically by `app.yaml` CI/CD pipeline. The following commands can be used for manual deployment if needed:
 
 ```bash
 # Alpha
@@ -325,97 +324,28 @@ helm upgrade --install production helm/nginx-sre \
   --namespace production --create-namespace
 ```
 
-> **GitOps Extension**: For full GitOps implementation, tools like ArgoCD or Flux can be integrated to enable pull-based deployment and drift detection.
-
----
-
-## Q6 - Linking Terraform Outputs to Helm
-
-### Method Used: CI/CD Pipeline Integration
-
-Terraform outputs are read during CI/CD and passed to Helm via `--set`:
-
-**Step 1: Define outputs in `terraform/outputs.tf`**
-
-```hcl
-output "cluster_name" {
-  value = module.eks.cluster_name
-}
-
-output "ecr_repository_url" {
-  value = aws_ecr_repository.nginx_sre.repository_url
-}
-```
-
-**Step 2: Read outputs in GitHub Actions and pass to Helm**
-
-```yaml
-# Read Terraform outputs (e.g. CloudArmor policy, cluster name, ECR URL)
-- name: Get Terraform outputs
-  run: |
-    cd terraform
-    echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> $GITHUB_ENV
-    echo "ECR_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_ENV
-    # Example: echo "ARMOR_POLICY=$(terraform output -raw cloud_armor_policy_name)" >> $GITHUB_ENV
-
-# Pass to Helm deploy
-- name: Deploy to EKS
-  run: |
-    helm upgrade --install ${{ env.ENV }} helm/nginx-sre \
-      --set clusterName=${{ env.CLUSTER_NAME }} \
-      --set image.repository=${{ env.ECR_URL }}
-      # Example: --set annotations.cloudArmor=${{ env.ARMOR_POLICY }}
-```
-
-### Comparison of Methods
-
-| Method | Description | Best For |
-|--------|-------------|----------|
-| CI/CD `--set` | Read terraform output and pass to helm | Simple projects ✅ |
-| `local_file` resource | Terraform writes values.yaml directly | Quick validation |
-| AWS Parameter Store | Terraform stores to SSM, CI/CD reads | Production |
-
 ---
 
 ## Screenshots
 
 Screenshots are available in `docs/screenshots/`:
 
-### Q1 - Terraform EKS Cluster
 | Screenshot | Description |
 |------------|-------------|
-| q1-eks-cluster.png | EKS Cluster on AWS Console (v1.33, Standard Support) |
-| q1-ec2-instances.png | EC2 Nodes running in us-east-1 (2x t3.micro) |
-| q1-kubectl-nodes.png | kubectl get nodes - 2 nodes Ready |
+| eks-cluster.png | EKS Cluster on AWS Console (v1.33, Standard Support) |
+| ec2-instances.png | EC2 Nodes running in us-east-1 (2x t3.micro) |
+| kubectl-nodes.png | kubectl get nodes - 2 nodes Ready |
+| hello-sre.png | curl output: Hello SRE! from LoadBalancer |
+| ecr-repository.png | ECR repository with nginx-sre image pushed |
+| load-balancer.png | AWS Classic Load Balancer created by Service |
+| helm-deploy.png | helm list showing deployed release |
+| kubectl-pods.png | Pods running in alpha namespace (READY 1/1) |
+| probe.png | Readiness/Liveness probe configured on /sre.txt |
+| github-actions-app.png | Build and Deploy workflow - all green |
+| github-actions-terraform.png | Terraform workflow - all green |
+| alpha-namespace.png | Services running in alpha namespace |
+| hpa-enabled.png | HPA enabled with CPU/Memory metrics (staging/production) |
+| hpa-disabled.png | HPA disabled in alpha environment (cost saving) |
 
-### Q2 - Dockerfile
-| Screenshot | Description |
-|------------|-------------|
-| q2-hello-sre.png | curl output: Hello SRE! from LoadBalancer |
 
-### Q3 - Helm Chart Deployment
-| Screenshot | Description |
-|------------|-------------|
-| q3-ecr-repository.png | ECR repository with nginx-sre image pushed |
-| q3-load-balancer.png | AWS Classic Load Balancer created by Service |
-| q3-helm-deploy.png | helm list showing deployed release |
-| q3-kubectl-pods.png | Pods running in alpha namespace (READY 1/1) |
-| q3-probe.png | Readiness/Liveness probe configured on /sre.txt |
 
-### Q4 - CI/CD Pipeline
-| Screenshot | Description |
-|------------|-------------|
-| q4-github-actions-app.png | Build and Deploy workflow - all green |
-| q4-github-actions-terraform.png | Terraform workflow - all green |
-
-### Q5 - Multi-Environment
-| Screenshot | Description |
-|------------|-------------|
-| q5-alpha-namespace.png | Services running in alpha namespace |
-| q5-hpa-enabled.png | HPA enabled with CPU/Memory metrics (staging/production) |
-| q5-hpa-disabled.png | HPA disabled in alpha environment (cost saving) |
----
-
-## AI Usage
-
-See [docs/AI_USAGE.md](docs/AI_USAGE.md) for complete details on AI assistance used in this project.
