@@ -7,6 +7,10 @@ on:
       - main              # → alpha 環境
       - release/beta      # → beta 環境
       - release/staging   # → staging 環境
+    paths:
+      - 'docker/**'
+      - 'helm/**'
+      - 'envs/**'    
   release:
     types: [published]    # → production 環境（打 tag 時觸發）
 
