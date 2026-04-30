@@ -1,9 +1,6 @@
-# Kubernetes SRE Platform on AWS
+# AWS EKS Infrastructure & CI/CD
 
-This project demonstrates a complete SRE workflow including infrastructure provisioning, containerization, Kubernetes deployment, CI/CD automation, and multi-environment deployment practices.
-
-> **AI Usage Declaration**: AI tools were extensively used throughout this project as a pair-programming assistant. 
-
+A production-oriented platform covering infrastructure provisioning, containerization, Kubernetes deployment, CI/CD automation, and multi-environment deployment practices on AWS EKS.
 ---
 
 ## Architecture Overview
