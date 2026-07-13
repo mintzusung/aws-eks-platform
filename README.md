@@ -62,7 +62,6 @@ sre-pretest/
 │   ├── staging/values.yaml       # Staging: moderate resources, HPA enabled (max 3)
 │   └── production/values.yaml    # Production: full resources, HPA enabled (max 5)
 └── docs/
-    ├── AI_USAGE.md               # AI tools usage declaration and prompts
     └── screenshots/              # Evidence screenshots for each question
 ```
 
